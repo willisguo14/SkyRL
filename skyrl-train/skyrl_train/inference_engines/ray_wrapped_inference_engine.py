@@ -144,11 +144,12 @@ def create_ray_wrapped_inference_engines(
             else:
                 actor_class = VLLMRayActor
 
-            lora_kwargs = {
-                "enable_lora": enable_lora,
-                "max_lora_rank": max_lora_rank,
-                "max_loras": max_loras,
-            }
+            # Build LoRA kwargs but let engine_init_kwargs override if provided.
+            lora_kwargs = {"enable_lora": enable_lora}
+            if "max_lora_rank" not in engine_init_kwargs:
+                lora_kwargs["max_lora_rank"] = max_lora_rank
+            if "max_loras" not in engine_init_kwargs:
+                lora_kwargs["max_loras"] = max_loras
 
             # Launch one actor per DP rank
             for dp_rank in range(data_parallel_size):
