@@ -90,7 +90,18 @@ class FSDPStrategy(DistributedStrategy):
             self.manual_offload_optimizer = False
 
         # LoRA related configs
-        self.is_lora = self.model_config.lora.rank > 0 if self.model_config is not None else False
+        self.is_lora = False
+        if self.model_config is not None:
+            if hasattr(self.model_config, "get"):
+                lora_cfg = self.model_config.get("lora", None)
+            else:
+                lora_cfg = getattr(self.model_config, "lora", None)
+            if lora_cfg is not None:
+                if hasattr(lora_cfg, "get"):
+                    lora_rank = lora_cfg.get("rank", 0)
+                else:
+                    lora_rank = getattr(lora_cfg, "rank", 0)
+                self.is_lora = lora_rank > 0
 
         self.time_steps = defaultdict(int)
 
@@ -233,6 +244,18 @@ class FSDPStrategy(DistributedStrategy):
         fsdp_mesh = self.device_mesh
         sharding_strategy = get_sharding_strategy(fsdp_mesh)
 
+        load_in_4bit = False
+        if self.model_config is not None:
+            if hasattr(self.model_config, "get"):
+                load_in_4bit = self.model_config.get("load_in_4bit", False)
+            elif hasattr(self.model_config, "model") and hasattr(self.model_config.model, "get"):
+                load_in_4bit = self.model_config.model.get("load_in_4bit", False)
+            else:
+                load_in_4bit = getattr(self.model_config, "load_in_4bit", False)
+        use_orig_params = self.fsdp_config.get("use_orig_params", False)
+        if load_in_4bit:
+            use_orig_params = True
+            
         # Wrap model with FSDP
         if self.fsdp_strategy == "fsdp":
             # cpu offloading will always be none for models that train with FSDP due to correctness issues with gradient accumulation -
@@ -243,7 +266,7 @@ class FSDPStrategy(DistributedStrategy):
                 model.model if is_wrapped else model,
                 cpu_offload=cpu_offload,
                 param_init_fn=init_fn,
-                use_orig_params=False,
+                use_orig_params=use_orig_params,
                 auto_wrap_policy=wrap_policy,
                 device_id=torch.cuda.current_device(),
                 sharding_strategy=sharding_strategy,

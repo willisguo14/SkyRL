@@ -34,6 +34,10 @@ class DeepSpeedPolicyWorkerBase(PolicyWorkerBase):
 
     def init_model(self, model_id_or_path, num_training_steps: int = None):
         assert self.cfg.trainer.strategy in ("deepspeed")
+        policy_model_cfg = self.cfg.trainer.policy.model
+        load_in_4bit = getattr(policy_model_cfg, "load_in_4bit", False)
+        if load_in_4bit and policy_model_cfg.lora.rank <= 0:
+            raise ValueError("load_in_4bit requires LoRA adapters; set trainer.policy.model.lora.rank > 0 for QLoRA.")
         self.zero_stage = self.cfg.trainer.policy.deepspeed_config.zero_optimization.stage
         if self.cfg.trainer.policy.optimizer_config.max_grad_norm > 0:
             self.cfg.trainer.policy.deepspeed_config.gradient_clipping = (
@@ -57,7 +61,8 @@ class DeepSpeedPolicyWorkerBase(PolicyWorkerBase):
         wrapped_model = HFModelWrapper(
             model_id_or_path,
             use_flash_attention_2=self.cfg.trainer.flash_attn,
-            bf16=self.cfg.trainer.bf16,
+            bf16=self.cfg.trainer.bf16 or load_in_4bit,
+            load_in_4bit=load_in_4bit,
             target_modules=self.cfg.trainer.target_modules,
             ds_config=ds_config,
             sequence_parallel_size=self.sequence_parallel_size,
@@ -259,6 +264,8 @@ class DeepSpeedCriticWorkerBase(CriticWorkerBase):
     def init_model(self, model_id_or_path, num_training_steps: int = None):
         assert self.cfg.trainer.strategy in ("deepspeed")
         self.zero_stage = self.cfg.trainer.critic.deepspeed_config.zero_optimization.stage
+        critic_model_cfg = self.cfg.trainer.critic.model
+        load_in_4bit = getattr(critic_model_cfg, "load_in_4bit", False)
         strategy = DeepspeedStrategy(
             self.cfg.trainer.critic.deepspeed_config,
             seed=self.cfg.trainer.seed,
@@ -280,7 +287,8 @@ class DeepSpeedCriticWorkerBase(CriticWorkerBase):
             model_id_or_path,
             "critic",
             use_flash_attention_2=self.cfg.trainer.flash_attn,
-            bf16=self.cfg.trainer.bf16,
+            bf16=self.cfg.trainer.bf16 or load_in_4bit,
+            load_in_4bit=load_in_4bit,
             target_modules=self.cfg.trainer.target_modules,
             ds_config=ds_config,
             value_head_prefix=self.cfg.trainer.algorithm.value_head_prefix,
@@ -331,6 +339,8 @@ class DeepSpeedRefWorkerBase(RefWorkerBase):
     def init_model(self, model_path):
         assert self.cfg.trainer.strategy in ("deepspeed")
         self.zero_stage = self.cfg.trainer.ref.deepspeed_config.zero_optimization.stage
+        ref_model_cfg = getattr(self.cfg.trainer.ref, "model", None)
+        load_in_4bit = getattr(ref_model_cfg, "load_in_4bit", False) if ref_model_cfg is not None else False
         strategy = DeepspeedStrategy(
             self.cfg.trainer.ref.deepspeed_config,
             seed=self.cfg.trainer.seed,
@@ -345,7 +355,8 @@ class DeepSpeedRefWorkerBase(RefWorkerBase):
         wrapped_model = HFModelWrapper(
             model_path,
             use_flash_attention_2=self.cfg.trainer.flash_attn,
-            bf16=self.cfg.trainer.bf16,
+            bf16=self.cfg.trainer.bf16 or load_in_4bit,
+            load_in_4bit=load_in_4bit,
             ds_config=strategy.get_ds_eval_config(),
             sequence_parallel_size=self.sequence_parallel_size,
             use_sample_packing=self.cfg.trainer.use_sample_packing,

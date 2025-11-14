@@ -157,7 +157,10 @@ miniswe = [
     "mini-swe-agent>=1.12.0",
     "litellm",
 ]
-
+bitsandbytes = [
+    # Added to support quantization
+    "bitsandbytes >= 0.48.0"
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

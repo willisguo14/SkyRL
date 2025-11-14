@@ -253,14 +253,39 @@ def fsdp2_load_full_state_dict(model: torch.nn.Module, full_sd: dict, cpu_offloa
     sharded_sd = {}
 
     # Rank 0 distributes the full state dict to other ranks
+    def _resolve_attr_from_name(module: torch.nn.Module, name: str):
+        """Resolve nested attributes/buffers/params, including bitsandbytes metadata (e.g., weight.quant_state.scale)."""
+        if not name:
+            return module
+
+        segments = name.split(".")
+        # Try longest module prefix down to none
+        for split_idx in range(len(segments), -1, -1):
+            module_path = ".".join(segments[:split_idx])
+            attr_segments = segments[split_idx:]
+            try:
+                current = module.get_submodule(module_path) if module_path else module
+            except AttributeError:
+                continue
+
+            success = True
+            for attr in attr_segments:
+                if not hasattr(current, attr):
+                    success = False
+                    break
+                current = getattr(current, attr)
+
+            if success:
+                return current
+        return None
+
     def _infer_parameter_dtype(model, param_name, empty_param):
         try:
             old_param = model.get_parameter_or_buffer(param_name)
         except AttributeError:
-            # Need this for LORA, as there some params are not *parameters* of sorts
-            base_param_name, local_param_name = param_name.rsplit(".", 1)
-            submodule = model.get_submodule(base_param_name)
-            old_param = getattr(submodule, local_param_name)
+            old_param = _resolve_attr_from_name(model, param_name)
+            if old_param is None:
+                return False, None
 
         is_torch_e4m3fn_available = hasattr(torch, "float8_e4m3fn")
         casting_dtype = None

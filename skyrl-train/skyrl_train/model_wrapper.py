@@ -63,6 +63,7 @@ class HFModelWrapper(nn.Module):
         sequence_parallel_size=1,
         use_sample_packing: bool = False,
         use_torch_compile: bool = False,
+        keep_norm_fp32: bool = True,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -98,6 +99,7 @@ class HFModelWrapper(nn.Module):
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_use_double_quant=True,
                     bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_quant_storage=torch.bfloat16,
                 )
             else:
                 nf4_config = None
@@ -160,7 +162,7 @@ class HFModelWrapper(nn.Module):
                         if isinstance(module, LoraLayer):
                             module = module.to(torch.bfloat16)
                         if "norm" in name:
-                            module = module.to(torch.float32)
+                            module = module.to(torch.float32 if keep_norm_fp32 else torch.bfloat16)
                         if "lm_head" in name or "embed_tokens" in name:
                             if hasattr(module, "weight"):
                                 module = module.to(torch.bfloat16)
@@ -525,6 +527,7 @@ def get_llm_for_sequence_regression(
     device_map=None,
     sequence_parallel_size=1,
     use_sample_packing: bool = False,
+    keep_norm_fp32: bool = True,
     **kwargs,
 ) -> nn.Module:
     """Get transformer with a sequence classification head on top (linear layer).
@@ -569,6 +572,7 @@ def get_llm_for_sequence_regression(
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
             bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_quant_storage=torch.bfloat16,
         )
     else:
         nf4_config = None
@@ -602,7 +606,7 @@ def get_llm_for_sequence_regression(
                 if isinstance(module, LoraLayer):
                     module = module.to(torch.bfloat16)
                 if "norm" in name:
-                    module = module.to(torch.float32)
+                    module = module.to(torch.float32 if keep_norm_fp32 else torch.bfloat16)
                 if value_head_prefix in name or "embed_tokens" in name:
                     if hasattr(module, "weight"):
                         module = module.to(torch.bfloat16)

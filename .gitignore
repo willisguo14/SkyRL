@@ -7,6 +7,10 @@ __pycache__/
 /skyrl-train/outputs/
 /data/lcb
 /data/gsm8k
+/ckpts/
+/exports/
+/.triton/
+/.config/
 
 # Documentation build artifacts
 /skyrl-train/docs/_build/

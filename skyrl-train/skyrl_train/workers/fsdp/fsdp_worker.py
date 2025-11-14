@@ -39,6 +39,11 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
 
     def init_model(self, model_path, num_training_steps: int = None):
         assert self.cfg.trainer.strategy in ("fsdp", "fsdp2")
+        policy_model_cfg = self.cfg.trainer.policy.model
+        load_in_4bit = getattr(policy_model_cfg, "load_in_4bit", False)
+        if load_in_4bit and policy_model_cfg.lora.rank <= 0:
+            raise ValueError("load_in_4bit requires LoRA adapters; set trainer.policy.model.lora.rank > 0 for QLoRA.")
+        keep_norm_fp32 = not (load_in_4bit and self.cfg.trainer.strategy in ("fsdp", "fsdp2"))
         strategy = FSDPStrategy(
             fsdp_config=self.cfg.trainer.policy.fsdp_config,
             optimizer_config=self.cfg.trainer.policy.optimizer_config,
@@ -59,7 +64,8 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
 
         model_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
         init_context = get_init_weight_context_manager(
-            use_meta_tensor=not model_config.tie_word_embeddings, mesh=self.strategy.device_mesh
+            use_meta_tensor=not model_config.tie_word_embeddings and not load_in_4bit,
+            mesh=self.strategy.device_mesh,
         )
         with init_context():
 
@@ -68,7 +74,8 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
                 use_flash_attention_2=self.cfg.trainer.flash_attn,
                 # NOTE (sumanthrh): Model initialization should always be in fp32
                 # during training
-                bf16=False,
+                bf16=True if load_in_4bit else False,
+                load_in_4bit=load_in_4bit,
                 lora_rank=self.cfg.trainer.policy.model.lora.rank,
                 lora_alpha=self.cfg.trainer.policy.model.lora.alpha,
                 lora_dropout=self.cfg.trainer.policy.model.lora.dropout,
@@ -77,6 +84,7 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
                 sequence_parallel_size=self.cfg.trainer.policy.sequence_parallel_size,
                 use_sample_packing=self.cfg.trainer.use_sample_packing,
                 use_torch_compile=self.cfg.trainer.policy.use_torch_compile,
+                keep_norm_fp32=keep_norm_fp32,
             )
             # in-place patch
             self._seq_parallel_monkey_patch(model=wrapped_model.model)
@@ -299,9 +307,13 @@ class FSDPCriticWorkerBase(CriticWorkerBase):
 
     def init_model(self, model_path, num_training_steps: int = None):
         assert self.cfg.trainer.strategy in ("fsdp", "fsdp2")
+        critic_model_cfg = self.cfg.trainer.critic.model
+        load_in_4bit = getattr(critic_model_cfg, "load_in_4bit", False)
+        keep_norm_fp32 = not (load_in_4bit and self.cfg.trainer.strategy in ("fsdp", "fsdp2"))
         strategy = FSDPStrategy(
             fsdp_config=self.cfg.trainer.critic.fsdp_config,
             optimizer_config=self.cfg.trainer.critic.optimizer_config,
+            model_config=self.cfg.trainer.critic.model,
             fsdp_strategy=self.cfg.trainer.strategy,
             seed=self.cfg.trainer.seed,
             micro_train_batch_size_per_gpu=self.cfg.trainer.micro_train_batch_size_per_gpu,
@@ -316,7 +328,8 @@ class FSDPCriticWorkerBase(CriticWorkerBase):
 
         model_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
         init_context = get_init_weight_context_manager(
-            use_meta_tensor=not model_config.tie_word_embeddings, mesh=self.strategy.device_mesh
+            use_meta_tensor=not model_config.tie_word_embeddings and not load_in_4bit,
+            mesh=self.strategy.device_mesh,
         )
         with init_context():
             critic = get_llm_for_sequence_regression(
@@ -325,7 +338,8 @@ class FSDPCriticWorkerBase(CriticWorkerBase):
                 use_flash_attention_2=self.cfg.trainer.flash_attn,
                 # NOTE (sumanthrh): Model initialization should always be in fp32
                 # during training
-                bf16=False,
+                bf16=True if load_in_4bit else False,
+                load_in_4bit=load_in_4bit,
                 lora_rank=self.cfg.trainer.critic.model.lora.rank,
                 lora_alpha=self.cfg.trainer.critic.model.lora.alpha,
                 lora_dropout=self.cfg.trainer.critic.model.lora.dropout,
@@ -334,6 +348,7 @@ class FSDPCriticWorkerBase(CriticWorkerBase):
                 init_value_head=self.cfg.trainer.policy.model.path == self.cfg.trainer.critic.model.path,
                 sequence_parallel_size=self.cfg.trainer.critic.sequence_parallel_size,
                 use_sample_packing=self.cfg.trainer.use_sample_packing,
+                keep_norm_fp32=keep_norm_fp32,
             )
             self._seq_parallel_monkey_patch(model=critic, use_parent_class=True)
 
@@ -375,8 +390,12 @@ class FSDPRefWorkerBase(RefWorkerBase):
 
     def init_model(self, model_path):
         assert self.cfg.trainer.strategy in ("fsdp", "fsdp2")
+        ref_model_cfg = getattr(self.cfg.trainer.ref, "model", None)
+        load_in_4bit = getattr(ref_model_cfg, "load_in_4bit", False) if ref_model_cfg is not None else False
+        keep_norm_fp32 = not (load_in_4bit and self.cfg.trainer.strategy in ("fsdp", "fsdp2"))
         strategy = FSDPStrategy(
             fsdp_config=self.cfg.trainer.ref.fsdp_config,
+            model_config=getattr(self.cfg.trainer.ref, "model", None),
             fsdp_strategy=self.cfg.trainer.strategy,
             seed=self.cfg.trainer.seed,
             micro_train_batch_size_per_gpu=self.cfg.trainer.micro_train_batch_size_per_gpu,
@@ -387,16 +406,19 @@ class FSDPRefWorkerBase(RefWorkerBase):
 
         model_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
         init_context = get_init_weight_context_manager(
-            use_meta_tensor=not model_config.tie_word_embeddings, mesh=self.strategy.device_mesh
+            use_meta_tensor=not model_config.tie_word_embeddings and not load_in_4bit,
+            mesh=self.strategy.device_mesh,
         )
 
         with init_context():
             wrapped_model = HFModelWrapper(
                 model_path,
                 use_flash_attention_2=self.cfg.trainer.flash_attn,
-                bf16=self.cfg.trainer.bf16,
+                bf16=self.cfg.trainer.bf16 or load_in_4bit,
+                load_in_4bit=load_in_4bit,
                 sequence_parallel_size=self.cfg.trainer.ref.sequence_parallel_size,
                 use_sample_packing=self.cfg.trainer.use_sample_packing,
+                keep_norm_fp32=keep_norm_fp32,
             )
             self._seq_parallel_monkey_patch(model=wrapped_model.model)
 
