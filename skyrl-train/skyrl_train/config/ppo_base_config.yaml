@@ -31,6 +31,8 @@ trainer:
           rank: 0
           alpha: 16
           dropout: 0
+          init_method: "default"  # "default" for standard LoRA, "pissa" for PiSSA, or "pissa_niter_16" for fast PiSSA
+          pissa_niter: 16  # Number of iterations for fast SVD (only used if init_method contains "pissa")
           lora_sync_path: "/tmp/skyrl_lora_sync"
     deepspeed_config: ${deepspeed_config.train}
     optimizer_config:
@@ -67,6 +69,8 @@ trainer:
         rank: 0
         alpha: 16
         dropout: 0
+        init_method: "default"  # "default" for standard LoRA, "pissa" for PiSSA, or "pissa_niter_16" for fast PiSSA
+        pissa_niter: 16  # Number of iterations for fast SVD (only used if init_method contains "pissa")
     deepspeed_config: ${deepspeed_config.train}
     optimizer_config:
       lr: 5.0e-6
