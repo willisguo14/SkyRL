@@ -184,8 +184,8 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
                     if 'lora' in name.lower():
                         continue
 
-                    # Replace .base_layer. with . to get clean parameter names
-                    clean_name = name.replace('.base_layer.', '.')
+                    # Remove PEFT naming: 'base_model.' prefix and '.base_layer.' components
+                    clean_name = name.replace('base_model.', '').replace('.base_layer.', '.')
                     params[clean_name] = param
 
                 if torch.distributed.get_rank() == 0:
