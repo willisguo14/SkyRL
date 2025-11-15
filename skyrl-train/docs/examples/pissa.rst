@@ -39,8 +39,7 @@ PiSSA can be configured for both policy and critic models in the training config
             rank: 32              # LoRA rank (higher = more parameters)
             alpha: 32             # LoRA scaling parameter
             dropout: 0            # LoRA dropout rate
-            init_method: "pissa_niter_16"  # PiSSA initialization method
-            pissa_niter: 16       # Number of iterations for fast SVD
+            init_method: "pissa"  # PiSSA initialization method
             lora_sync_path: "/tmp/skyrl_lora_sync"  # Path for adapter sync
       critic:
         model:
@@ -49,8 +48,7 @@ PiSSA can be configured for both policy and critic models in the training config
             rank: 32
             alpha: 32
             dropout: 0
-            init_method: "pissa_niter_16"
-            pissa_niter: 16
+            init_method: "pissa"
 
 Key Parameters
 ~~~~~~~~~~~~~~
@@ -61,18 +59,9 @@ Key Parameters
 - **``init_method``**: The initialization method for adapters. Options:
 
   - ``"default"``: Standard LoRA random initialization
-  - ``"pissa"``: Full SVD decomposition (slower but more accurate)
-  - ``"pissa_niter_16"``: Fast SVD with 16 iterations (recommended)
+  - ``"pissa"``: PiSSA SVD-based initialization
 
-- **``pissa_niter``**: Number of iterations for fast SVD (only used when ``init_method`` contains "pissa"). Default: 16. Higher values = more accurate but slower initialization.
 - **``lora_sync_path``**: Directory path where LoRA adapters are saved and synchronized between training and inference engines.
-
-Choosing Init Method
-~~~~~~~~~~~~~~~~~~~~~
-
-- **``pissa_niter_16``** (recommended): Fast SVD initialization. Takes ~30 seconds for large models. Good balance of speed and accuracy.
-- **``pissa``**: Full SVD initialization. Takes 2-5 minutes for large models. Slightly more accurate but often not worth the extra time.
-- **``default``**: Standard LoRA random initialization. Use this if you want standard LoRA behavior.
 
 Target Modules
 ~~~~~~~~~~~~~~
@@ -122,8 +111,7 @@ Create a training script with PiSSA configuration:
      trainer.policy.model.path="Qwen/Qwen2.5-0.5B-Instruct" \
      trainer.policy.model.lora.rank=32 \
      trainer.policy.model.lora.alpha=32 \
-     trainer.policy.model.lora.init_method="pissa_niter_16" \
-     trainer.policy.model.lora.pissa_niter=16 \
+     trainer.policy.model.lora.init_method="pissa" \
      trainer.policy.model.lora.lora_sync_path="/tmp/skyrl_lora_sync" \
      trainer.strategy=fsdp2 \
      trainer.placement.colocate_all=true \
@@ -173,18 +161,6 @@ This two-step sync ensures vLLM has the correct base weights that were modified 
 
 - Base weights are extracted from the PEFT model, cleaned of internal PEFT naming (``.base_layer.``), and synced
 - After base sync completes, adapters are saved to disk and loaded by vLLM
-- Checkpoint metadata tracks ``is_pissa`` and ``init_method`` for proper resumption
-
-Requirements
-------------
-
-PiSSA requires ``peft>=0.11.0`` for SVD initialization support:
-
-.. code-block:: bash
-
-   pip install --upgrade peft
-
-The validation code will automatically check your PEFT version and raise an error if it's too old.
 
 Configuration Tips
 ------------------
@@ -193,25 +169,14 @@ Configuration Tips
 
 2. **Rank:** Choose a rank large enough to capture the principal components. Start with 32-64 for most RL fine-tuning tasks.
 
-3. **Init method:** Use ``pissa_niter_16`` for the best balance of speed and accuracy. Only use full ``pissa`` if you need the most accurate SVD.
+3. **Layer coverage:** Apply PiSSA to *all* layers, particularly MLP/MoE layers — attention-only PiSSA tends to underperform.
 
-4. **Layer coverage:** Apply PiSSA to *all* layers, particularly MLP/MoE layers — attention-only PiSSA tends to underperform.
-
-5. **Initialization time:** Expect ~30 seconds of initialization time for fast SVD on large models. This is a one-time cost at startup.
+4. **Initialization time:** PiSSA initialization with SVD takes 2-5 minutes for large models. This is a one-time cost at startup.
 
 Checkpointing
 -------------
 
-PiSSA checkpoints include metadata to track the initialization method:
-
-- ``is_pissa``: Boolean flag indicating PiSSA initialization
-- ``lora_init_method``: String indicating the exact init method used
-
-When resuming from a PiSSA checkpoint, the system automatically detects and logs that you're resuming PiSSA training:
-
-.. code-block:: text
-
-   [PiSSA] Resuming PiSSA training from checkpoint (init_method=pissa_niter_16)
+PiSSA checkpoints work the same as LoRA checkpoints. The PEFT configuration (including the PiSSA initialization method) is automatically saved with the model weights and restored when you resume training.
 
 Current Limitations
 -------------------

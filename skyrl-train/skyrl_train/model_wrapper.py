@@ -38,7 +38,6 @@ class HFModelWrapper(nn.Module):
         target_modules (list, optional): List of target modules for applying LoRA. Defaults to None.
         exclude_modules (list, optional): List of modules to exclude from applying LoRA. Defaults to None.
         init_method (str, optional): LoRA initialization method. "default" for random init, "pissa" for PiSSA. Defaults to "default".
-        pissa_niter (int, optional): Number of iterations for fast SVD in PiSSA. Defaults to None (full SVD).
         ds_config (dict, optional): Configuration for DeepSpeed, enabling model partitioning across multiple GPUs. Defaults to None.
         device_map (dict, optional): Device mapping for loading the model onto specific devices. Defaults to None.
         packing_samples (bool, optional): Whether to pack samples during training. Defaults to False.
@@ -59,7 +58,6 @@ class HFModelWrapper(nn.Module):
         target_modules=None,
         exclude_modules=None,
         init_method="default",
-        pissa_niter=None,
         ds_config=None,
         device_map=None,
         temperature=1.0,
@@ -153,11 +151,8 @@ class HFModelWrapper(nn.Module):
 
                 # Determine initialization method for LoRA
                 if init_method == "pissa":
-                    if pissa_niter is not None:
-                        init_lora_weights = f"pissa_niter_{pissa_niter}"
-                    else:
-                        init_lora_weights = "pissa"
-                    logger.info(f"Using PiSSA initialization: {init_lora_weights}")
+                    init_lora_weights = "pissa"
+                    logger.info("Using PiSSA initialization")
                 else:
                     init_lora_weights = True  # Default LoRA random initialization
 
@@ -537,7 +532,6 @@ def get_llm_for_sequence_regression(
     exclude_modules=None,
     lora_dropout=0,
     init_method="default",
-    pissa_niter=None,
     use_flash_attention_2=False,
     ds_config: dict = None,
     init_value_head: bool = False,
@@ -611,11 +605,8 @@ def get_llm_for_sequence_regression(
 
         # Determine initialization method for LoRA
         if init_method == "pissa":
-            if pissa_niter is not None:
-                init_lora_weights = f"pissa_niter_{pissa_niter}"
-            else:
-                init_lora_weights = "pissa"
-            logger.info(f"Using PiSSA initialization for critic: {init_lora_weights}")
+            init_lora_weights = "pissa"
+            logger.info("Using PiSSA initialization for critic")
         else:
             init_lora_weights = True  # Default LoRA random initialization
 

@@ -303,33 +303,6 @@ def validate_cfg(cfg: DictConfig):
         assert cfg.generator.backend == "vllm", "LoRA enabled requires vLLM backend"
         assert cfg.trainer.strategy in ("fsdp", "fsdp2"), "LoRA enabled requires fsdp/fsdp2 training backend"
 
-        # PiSSA-specific validation
-        init_method = cfg.trainer.policy.model.lora.get("init_method", "default")
-        if init_method.startswith("pissa"):
-            # Check PEFT version
-            import peft
-            from packaging import version
-
-            if version.parse(peft.__version__) < version.parse("0.11.0"):
-                raise ValueError(
-                    f"PiSSA requires peft>=0.11.0, but found peft=={peft.__version__}. "
-                    "Please upgrade: pip install --upgrade peft"
-                )
-
-            # Warn about SVD computation time
-            from loguru import logger
-
-            if init_method == "pissa":
-                logger.warning(
-                    "[PiSSA] Using full SVD initialization - this may take 2-5 minutes for large models. "
-                    "For faster initialization, use init_method='pissa_niter_16'"
-                )
-
-            logger.info(
-                f"[PiSSA] Initialization method: {init_method}. "
-                "Base model will be modified (W → W_residual) during initialization."
-            )
-
     # Validate placement
     if cfg.trainer.placement.colocate_all:
         num_policy_gpus = cfg.trainer.placement.policy_num_gpus_per_node * cfg.trainer.placement.policy_num_nodes

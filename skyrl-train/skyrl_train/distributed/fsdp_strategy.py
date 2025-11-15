@@ -493,24 +493,6 @@ class FSDPStrategy(DistributedStrategy):
                         "rng": self.get_rng_state(),  # Add RNG state for reproducibility
                     }
 
-                    # Add PiSSA metadata if using LoRA
-                    if self.is_lora and hasattr(save_model, "peft_config"):
-                        # Extract LoRA init method from peft config
-                        peft_config = save_model.peft_config
-                        # peft_config is a dict of adapter_name -> LoraConfig
-                        # Get the first (default) adapter config
-                        first_adapter = next(iter(peft_config.values()))
-                        init_lora_weights = getattr(first_adapter, "init_lora_weights", True)
-
-                        # Determine if this is PiSSA based on init_lora_weights value
-                        is_pissa = isinstance(init_lora_weights, str) and "pissa" in init_lora_weights.lower()
-
-                        extra_state_dict["is_pissa"] = is_pissa
-                        extra_state_dict["lora_init_method"] = str(init_lora_weights)
-
-                        if is_pissa and rank == 0:
-                            self.print(f"[PiSSA] Saving checkpoint with init_method={init_lora_weights}")
-
                     # Save extra state
                     self.print(f"[rank-{rank}]: Saving extra_state to {extra_path}")
                     with io.open_file(extra_path, "wb") as f:
@@ -625,11 +607,6 @@ class FSDPStrategy(DistributedStrategy):
         # Load RNG state for reproducibility
         if "rng" in extra_state_dict:
             self.load_rng_state(extra_state_dict["rng"])
-
-        # Log PiSSA information if present in checkpoint
-        if extra_state_dict.get("is_pissa", False) and rank == 0:
-            lora_init_method = extra_state_dict.get("lora_init_method", "unknown")
-            self.print(f"[PiSSA] Resuming PiSSA training from checkpoint (init_method={lora_init_method})")
 
         # Wait for all ranks to finish loading
         dist.barrier()

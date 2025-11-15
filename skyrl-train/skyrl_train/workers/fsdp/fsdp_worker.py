@@ -88,7 +88,6 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
                 target_modules=self.cfg.trainer.target_modules,
                 exclude_modules=self.cfg.trainer.exclude_modules,
                 init_method=self.cfg.trainer.policy.model.lora.get("init_method", "default"),
-                pissa_niter=self.cfg.trainer.policy.model.lora.get("pissa_niter", None),
                 sequence_parallel_size=self.cfg.trainer.policy.sequence_parallel_size,
                 use_sample_packing=self.cfg.trainer.use_sample_packing,
                 use_torch_compile=self.cfg.trainer.policy.use_torch_compile,
@@ -168,12 +167,10 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
         peft_model = getattr(self.model.model, "_fsdp_wrapped_module", self.model.model)
 
         # Determine what to sync based on model type
-        need_adapter_sync_after = False
-
         if self._is_lora:
             assert hasattr(peft_model, "peft_config"), "LoRA model should have peft_config"
 
-            # PiSSA first sync: extract base weights and prepare for full sync
+            # PiSSA first sync: sync base weights + adapters
             if self._is_pissa and not self._pissa_base_synced:
                 from loguru import logger
                 logger.info("[PiSSA] First sync - extracting base weights (W_residual)")
@@ -183,7 +180,7 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
                 full_state_dict = peft_model.state_dict()
 
                 for name, param in full_state_dict.items():
-                    # Skip LoRA adapter parameters (simplified check)
+                    # Skip LoRA adapter parameters
                     if 'lora' in name.lower():
                         continue
 
@@ -194,21 +191,17 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
                 if torch.distributed.get_rank() == 0:
                     logger.info(f"[PiSSA] Extracted {len(params)} base parameters for sync")
 
-                # Mark that we need to sync adapters after base weights
-                need_adapter_sync_after = True
-                # Fall through to sync logic below
+                # Sync base weights (fall through to sync logic below)
 
-            # Normal LoRA (or subsequent PiSSA syncs): adapter-only sync
-            elif not (self._is_pissa and not self._pissa_base_synced):
+            else:
+                # Normal LoRA (or subsequent PiSSA syncs): adapter-only sync
                 lora_sync_path = self.cfg.trainer.policy.model.lora.lora_sync_path
                 await self._save_lora_adapters_and_sync(peft_model, lora_sync_path, inference_engine_client)
                 return
 
-        # Non-LoRA model: full sync
-        if not self._is_lora or (self._is_pissa and not self._pissa_base_synced):
-            if not (self._is_pissa and not self._pissa_base_synced):
-                # Non-LoRA: get full state dict
-                params = self.model.model.state_dict()
+        else:
+            # Non-LoRA model: full sync
+            params = self.model.model.state_dict()
 
         if not self.use_cuda_ipc:
             for name, param in params.items():
@@ -308,7 +301,7 @@ class FSDPPolicyWorkerBase(PolicyWorkerBase):
             torch.cuda.synchronize()
 
         # After base weight sync, also sync adapters for PiSSA first time
-        if need_adapter_sync_after:
+        if self._is_pissa and not self._pissa_base_synced:
             from loguru import logger
             logger.info("[PiSSA] Base weights synced, now syncing adapters")
             lora_sync_path = self.cfg.trainer.policy.model.lora.lora_sync_path

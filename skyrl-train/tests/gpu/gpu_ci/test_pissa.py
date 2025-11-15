@@ -21,7 +21,7 @@ from skyrl_train.entrypoints.main_base import config_dir
 MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 
 
-def get_test_pissa_config(init_method: str = "pissa", pissa_niter: int = 16) -> DictConfig:
+def get_test_pissa_config(init_method: str = "pissa") -> DictConfig:
     """Get base config with PiSSA-specific overrides."""
     with hydra.initialize_config_dir(config_dir=config_dir):
         cfg = hydra.compose(config_name="ppo_base_config")
@@ -39,27 +39,20 @@ def get_test_pissa_config(init_method: str = "pissa", pissa_niter: int = 16) -> 
         cfg.trainer.policy.model.lora.alpha = 32
         cfg.trainer.policy.model.lora.dropout = 0.1
         cfg.trainer.policy.model.lora.init_method = init_method
-        cfg.trainer.policy.model.lora.pissa_niter = pissa_niter
         cfg.trainer.target_modules = "all-linear"
 
         return cfg
 
 
-@pytest.mark.parametrize(
-    ("init_method", "pissa_niter"),
-    [
-        pytest.param("pissa", None, marks=pytest.mark.vllm, id="pissa_full_svd"),
-        pytest.param("pissa_niter_16", 16, marks=pytest.mark.vllm, id="pissa_fast_svd"),
-    ],
-)
-def test_pissa_initialization(init_method, pissa_niter):
+@pytest.mark.vllm
+def test_pissa_initialization():
     """
-    Tests PiSSA initialization with both full SVD and fast SVD methods.
+    Tests PiSSA initialization with SVD.
     Verifies that the model can be initialized with PiSSA and adapters are created correctly.
     """
     from skyrl_train.model_wrapper import HFModelWrapper
 
-    cfg = get_test_pissa_config(init_method=init_method, pissa_niter=pissa_niter)
+    cfg = get_test_pissa_config(init_method="pissa")
 
     # Initialize model with PiSSA
     model_wrapper = HFModelWrapper(
@@ -67,8 +60,7 @@ def test_pissa_initialization(init_method, pissa_niter):
         lora_rank=cfg.trainer.policy.model.lora.rank,
         lora_alpha=cfg.trainer.policy.model.lora.alpha,
         lora_dropout=cfg.trainer.policy.model.lora.dropout,
-        init_method=init_method,
-        pissa_niter=pissa_niter,
+        init_method="pissa",
         target_modules=cfg.trainer.target_modules,
         load_in_4bit=False,
         flash_attn=False,
@@ -86,12 +78,9 @@ def test_pissa_initialization(init_method, pissa_niter):
     first_adapter = next(iter(peft_config.values()))
     init_lora_weights = getattr(first_adapter, "init_lora_weights", True)
 
-    if init_method.startswith("pissa"):
-        assert isinstance(init_lora_weights, str), "PiSSA should use string init_lora_weights"
-        assert "pissa" in init_lora_weights.lower(), f"init_lora_weights should contain 'pissa', got {init_lora_weights}"
-        print(f"[PiSSA Test] Successfully initialized with init_method={init_lora_weights}")
-    else:
-        assert init_lora_weights is True, "Non-PiSSA should use default True init_lora_weights"
+    assert isinstance(init_lora_weights, str), "PiSSA should use string init_lora_weights"
+    assert "pissa" in init_lora_weights.lower(), f"init_lora_weights should contain 'pissa', got {init_lora_weights}"
+    print(f"[PiSSA Test] Successfully initialized with init_method={init_lora_weights}")
 
     # Verify that adapters exist
     adapter_names = list(model_wrapper.model.peft_config.keys())
@@ -118,7 +107,7 @@ def test_pissa_weight_sync_e2e(ray_init_fixture, colocate_all, weight_sync_backe
     2. Subsequent syncs are adapter-only
     3. Inference works correctly with PiSSA adapters
     """
-    cfg = get_test_pissa_config(init_method="pissa_niter_16", pissa_niter=16)
+    cfg = get_test_pissa_config(init_method="pissa")
     cfg.trainer.placement.colocate_all = colocate_all
     cfg.generator.weight_sync_backend = weight_sync_backend
     cfg.trainer.strategy = strategy
@@ -184,7 +173,7 @@ def test_pissa_checkpoint_metadata():
     if not dist.is_initialized():
         pytest.skip("Requires distributed environment")
 
-    cfg = get_test_pissa_config(init_method="pissa_niter_16", pissa_niter=16)
+    cfg = get_test_pissa_config(init_method="pissa")
 
     # Initialize model with PiSSA
     model_wrapper = HFModelWrapper(
@@ -192,8 +181,7 @@ def test_pissa_checkpoint_metadata():
         lora_rank=cfg.trainer.policy.model.lora.rank,
         lora_alpha=cfg.trainer.policy.model.lora.alpha,
         lora_dropout=cfg.trainer.policy.model.lora.dropout,
-        init_method="pissa_niter_16",
-        pissa_niter=16,
+        init_method="pissa",
         target_modules=cfg.trainer.target_modules,
         load_in_4bit=False,
         flash_attn=False,

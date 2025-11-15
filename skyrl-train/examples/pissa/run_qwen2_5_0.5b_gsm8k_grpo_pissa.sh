@@ -10,7 +10,7 @@ set -x
 # bash examples/pissa/run_qwen2_5_0.5b_gsm8k_grpo_pissa.sh
 
 # NOTE (sumanthrh): `micro_train_batch_size_per_gpu` and `micro_forward_batch_size_per_gpu` can be tuned
-# NOTE: PiSSA initialization takes ~30 seconds with fast SVD (pissa_niter_16) or 2-5 minutes with full SVD (pissa)
+# NOTE: PiSSA initialization with SVD takes 2-5 minutes for large models
 
 DATA_DIR="$HOME/data/gsm8k"
 NUM_GPUS=4
@@ -27,8 +27,7 @@ uv run --isolated --extra $INFERENCE_BACKEND -m skyrl_train.entrypoints.main_bas
   trainer.placement.colocate_all=true \
   trainer.policy.model.lora.rank=32 \
   trainer.policy.model.lora.alpha=32 \
-  trainer.policy.model.lora.init_method="pissa_niter_16" \
-  trainer.policy.model.lora.pissa_niter=16 \
+  trainer.policy.model.lora.init_method="pissa" \
   trainer.strategy=fsdp2 \
   trainer.placement.policy_num_gpus_per_node=$NUM_GPUS \
   trainer.placement.ref_num_gpus_per_node=$NUM_GPUS \
