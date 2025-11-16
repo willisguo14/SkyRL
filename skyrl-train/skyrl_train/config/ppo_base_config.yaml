@@ -31,6 +31,7 @@ trainer:
           rank: 0
           alpha: 16
           dropout: 0
+          init_method: "default"  # "default" or "pissa" for PiSSA initialization (full SVD)
           lora_sync_path: "/tmp/skyrl_lora_sync"
     deepspeed_config: ${deepspeed_config.train}
     optimizer_config:
@@ -67,6 +68,7 @@ trainer:
         rank: 0
         alpha: 16
         dropout: 0
+        init_method: "default"  # "default" or "pissa" for PiSSA initialization (full SVD)
     deepspeed_config: ${deepspeed_config.train}
     optimizer_config:
       lr: 5.0e-6
@@ -174,6 +176,7 @@ trainer:
 
 generator:
   model_name: ${trainer.policy.model.path}
+  vllm_model_path: null  # Optional: separate model path for vLLM engine initialization. If null, uses trainer.policy.model.path
   model_dtype: "bfloat16" # should match dtype for inference engine
   run_engines_locally: true
   num_inference_engines: 1
