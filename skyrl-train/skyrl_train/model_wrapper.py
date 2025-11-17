@@ -159,8 +159,6 @@ class HFModelWrapper(nn.Module):
                 # Add PISSA initialization support
                 if lora_init_method == "pissa":
                     lora_config_kwargs["init_lora_weights"] = "pissa"
-                    # Use full SVD (niter=0) instead of fast SVD for PISSA
-                    lora_config_kwargs["lora_init_kwargs"] = {"niter": 0}
 
                 lora_config = LoraConfig(**lora_config_kwargs)
                 self.model = get_peft_model(self.model, lora_config)
@@ -611,8 +609,6 @@ def get_llm_for_sequence_regression(
         # Add PISSA initialization support
         if lora_init_method == "pissa":
             lora_config_kwargs["init_lora_weights"] = "pissa"
-            # Use full SVD (niter=0) instead of fast SVD for PISSA
-            lora_config_kwargs["lora_init_kwargs"] = {"niter": 0}
 
         lora_config = LoraConfig(**lora_config_kwargs)
         model = get_peft_model(model, lora_config)
