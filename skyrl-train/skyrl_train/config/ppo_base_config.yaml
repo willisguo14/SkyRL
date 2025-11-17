@@ -176,7 +176,7 @@ trainer:
 
 generator:
   model_name: ${trainer.policy.model.path}
-  vllm_model_path: null  # Optional: separate model path for vLLM engine initialization. If null, uses trainer.policy.model.path
+  inference_engine_path: null  # Optional: separate model path for inference engine initialization. If null, uses trainer.policy.model.path
   model_dtype: "bfloat16" # should match dtype for inference engine
   run_engines_locally: true
   num_inference_engines: 1

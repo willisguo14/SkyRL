@@ -1,14 +1,26 @@
 set -x
 
-set -x
-
 # Colocated GRPO LoRA training + generation for Qwen2.5-0.5B-Instruct on GSM8K.
 
 # uv run examples/gsm8k/gsm8k_dataset.py --output_dir $HOME/data/gsm8k
 # export WANDB_API_KEY=<your_key_here>
-# bash examples/lora/run_qwen2_5_0.5b_gsm8k_grpo_lora.sh
+# bash examples/lora/pissa/run_qwen2_5_0.5b_gsm8k_grpo_pissa.sh
 
 # NOTE (sumanthrh): `micro_train_batch_size_per_gpu` and `micro_forward_batch_size_per_gpu` can be tuned
+
+# PiSSA Configuration
+RANK=32
+HF_MODEL_PATH="Qwen/Qwen2.5-0.5B-Instruct"
+PISSA_BASE_SAVE_PATH="/data/user_data/willisg/pissa"
+
+# Prepare PiSSA base model
+python save_pissa_base.py \
+  --base_save_path "$PISSA_BASE_SAVE_PATH" \
+  --rank "$RANK" \
+  --hf_path "$HF_MODEL_PATH"
+
+# Construct the inference engine path
+INFERENCE_ENGINE_PATH="$PISSA_BASE_SAVE_PATH/$HF_MODEL_PATH"
 
 DATA_DIR="/data/user_data/willisg/gsm8k"
 NUM_GPUS=2
@@ -21,15 +33,15 @@ uv run --isolated --extra $INFERENCE_BACKEND -m skyrl_train.entrypoints.main_bas
   data.train_data="['$DATA_DIR/train.parquet']" \
   data.val_data="['$DATA_DIR/validation.parquet']" \
   trainer.algorithm.advantage_estimator="grpo" \
-  trainer.policy.model.path="Qwen/Qwen2.5-0.5B-Instruct" \
+  trainer.policy.model.path="$HF_MODEL_PATH" \
   trainer.placement.colocate_all=true \
-  trainer.policy.model.lora.rank=32 \
+  trainer.policy.model.lora.rank="$RANK" \
   trainer.policy.model.lora.alpha=32 \
   trainer.policy.model.lora.init_method="pissa" \
   trainer.strategy=fsdp2 \
   trainer.placement.policy_num_gpus_per_node=$NUM_GPUS \
   trainer.placement.ref_num_gpus_per_node=$NUM_GPUS \
-  generator.vllm_model_path="/data/user_data/willisg/pissa/qwen/qwen2_5_0_5B_instruct/rank_32" \
+  generator.inference_engine_path="$INFERENCE_ENGINE_PATH" \
   generator.num_inference_engines=$NUM_GPUS \
   generator.inference_engine_tensor_parallel_size=1 \
   trainer.epochs=20 \

@@ -37,15 +37,15 @@ __all__ = ["BasePPOExp", "config_dir"]
 def create_ray_wrapped_inference_engines_from_config(cfg: DictConfig, colocate_pg, tokenizer: PreTrainedTokenizerBase):
     from skyrl_train.inference_engines.ray_wrapped_inference_engine import create_ray_wrapped_inference_engines
 
-    # Use vllm_model_path if specified, otherwise fall back to trainer.policy.model.path
-    vllm_model_path = cfg.generator.get("vllm_model_path") or cfg.trainer.policy.model.path
+    # Use inference_engine_path if specified, otherwise fall back to trainer.policy.model.path
+    inference_engine_path = cfg.generator.get("inference_engine_path") or cfg.trainer.policy.model.path
 
     engine_kwargs = {
         "num_inference_engines": cfg.generator.num_inference_engines,
         "tensor_parallel_size": cfg.generator.inference_engine_tensor_parallel_size,
         "pipeline_parallel_size": cfg.generator.inference_engine_pipeline_parallel_size,
         "model_dtype": cfg.generator.model_dtype,
-        "pretrain": vllm_model_path,
+        "pretrain": inference_engine_path,
         "seed": cfg.trainer.seed,
         "vllm_v1_disable_multiproc": cfg.generator.vllm_v1_disable_multiproc,
         "enable_prefix_caching": cfg.generator.enable_prefix_caching,
