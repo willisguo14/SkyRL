@@ -54,6 +54,7 @@ class HFModelWrapper(nn.Module):
         lora_rank=0,
         lora_alpha=16,
         lora_dropout=0,
+        lora_init_method="default",
         target_modules=None,
         exclude_modules=None,
         ds_config=None,
@@ -146,15 +147,20 @@ class HFModelWrapper(nn.Module):
             if lora_rank > 0:
                 # https://github.com/huggingface/peft/issues/137
                 self.model.enable_input_require_grads()
-                lora_config = LoraConfig(
-                    task_type=TaskType.CAUSAL_LM,
-                    r=lora_rank,
-                    lora_alpha=lora_alpha,
-                    target_modules=target_modules,
-                    exclude_modules=exclude_modules,
-                    lora_dropout=lora_dropout,
-                    bias="none",
-                )
+                lora_config_kwargs = {
+                    "task_type": TaskType.CAUSAL_LM,
+                    "r": lora_rank,
+                    "lora_alpha": lora_alpha,
+                    "target_modules": target_modules,
+                    "exclude_modules": exclude_modules,
+                    "lora_dropout": lora_dropout,
+                    "bias": "none",
+                }
+                # Add PISSA initialization support
+                if lora_init_method == "pissa":
+                    lora_config_kwargs["init_lora_weights"] = "pissa"
+
+                lora_config = LoraConfig(**lora_config_kwargs)
                 self.model = get_peft_model(self.model, lora_config)
 
                 if load_in_4bit:
@@ -517,6 +523,7 @@ def get_llm_for_sequence_regression(
     load_in_4bit=False,
     lora_rank=0,
     lora_alpha=16,
+    lora_init_method="default",
     target_modules=None,
     exclude_modules=None,
     lora_dropout=0,
@@ -590,15 +597,20 @@ def get_llm_for_sequence_regression(
     # LoRA
     if lora_rank > 0:
         model.enable_input_require_grads()
-        lora_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            r=lora_rank,
-            lora_alpha=lora_alpha,
-            target_modules=target_modules,
-            exclude_modules=exclude_modules,
-            lora_dropout=lora_dropout,
-            bias="none",
-        )
+        lora_config_kwargs = {
+            "task_type": TaskType.CAUSAL_LM,
+            "r": lora_rank,
+            "lora_alpha": lora_alpha,
+            "target_modules": target_modules,
+            "exclude_modules": exclude_modules,
+            "lora_dropout": lora_dropout,
+            "bias": "none",
+        }
+        # Add PISSA initialization support
+        if lora_init_method == "pissa":
+            lora_config_kwargs["init_lora_weights"] = "pissa"
+
+        lora_config = LoraConfig(**lora_config_kwargs)
         model = get_peft_model(model, lora_config)
 
         if load_in_4bit:
