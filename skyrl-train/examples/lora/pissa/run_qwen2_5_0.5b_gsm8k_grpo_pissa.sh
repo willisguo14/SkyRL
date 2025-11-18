@@ -9,7 +9,7 @@ set -x
 # NOTE (sumanthrh): `micro_train_batch_size_per_gpu` and `micro_forward_batch_size_per_gpu` can be tuned
 
 # PiSSA Configuration
-RANK=32
+RANK=8
 HF_MODEL_PATH="Qwen/Qwen2.5-0.5B-Instruct"
 PISSA_BASE_SAVE_PATH="/data/user_data/willisg/pissa"
 
@@ -20,7 +20,7 @@ python save_pissa_base.py \
   --hf_path "$HF_MODEL_PATH"
 
 # Construct the inference engine path
-INFERENCE_ENGINE_PATH="$PISSA_BASE_SAVE_PATH/$HF_MODEL_PATH"
+INFERENCE_ENGINE_PATH="$PISSA_BASE_SAVE_PATH/$HF_MODEL_PATH/rank_${RANK}"
 
 DATA_DIR="/data/user_data/willisg/gsm8k"
 NUM_GPUS=2

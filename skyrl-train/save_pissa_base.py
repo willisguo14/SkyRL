@@ -11,7 +11,7 @@ def prep_pissa(
     hf_path,
     rank,
 ):
-    save_path = os.path.join(base_save_path, hf_path)
+    save_path = os.path.join(base_save_path, hf_path, f"rank_{rank}")
 
     # Check if path already exists
     if os.path.exists(save_path):
