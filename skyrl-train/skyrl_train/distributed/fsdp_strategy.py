@@ -290,9 +290,15 @@ class FSDPStrategy(DistributedStrategy):
                 "reshard_after_forward": self.fsdp_config.get("reshard_after_forward", True),
             }
             module = model.model if is_wrapped else model
-            full_state = module.state_dict()
-            apply_fsdp2(module, fsdp_kwargs, self.fsdp_config)
-            fsdp2_load_full_state_dict(module, full_state, cpu_offload)
+            if load_in_4bit:
+                # HFModelWrapper already created quantized weights (incl. BitsAndBytes metadata).
+                # Let FSDP2 shard those tensors directly; replaying a dense state dict would drop the
+                # quantization states and trigger missing/unexpected key errors.
+                apply_fsdp2(module, fsdp_kwargs, self.fsdp_config)
+            else:
+                full_state = module.state_dict()
+                apply_fsdp2(module, fsdp_kwargs, self.fsdp_config)
+                fsdp2_load_full_state_dict(module, full_state, cpu_offload)
             fsdp_module = module
         else:
             raise NotImplementedError(f"{self.fsdp_strategy} not implemented")

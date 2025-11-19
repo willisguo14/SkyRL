@@ -9,9 +9,9 @@ set -x
 # NOTE (sumanthrh): `micro_train_batch_size_per_gpu` and `micro_forward_batch_size_per_gpu` can be tuned
 
 # PiSSA Configuration
-RANK=8
-HF_MODEL_PATH="Qwen/Qwen2.5-0.5B-Instruct"
-PISSA_BASE_SAVE_PATH="/data/user_data/willisg/pissa"
+: "${RANK:=8}"
+: "${HF_MODEL_PATH:="Qwen/Qwen2.5-0.5B-Instruct"}"
+: "${PISSA_BASE_SAVE_PATH:="$HOME/data/pissa"}"
 
 # Prepare PiSSA base model
 python save_pissa_base.py \
@@ -22,11 +22,14 @@ python save_pissa_base.py \
 # Construct the inference engine path
 INFERENCE_ENGINE_PATH="$PISSA_BASE_SAVE_PATH/$HF_MODEL_PATH/rank_${RANK}"
 
-DATA_DIR="/data/user_data/willisg/gsm8k"
-NUM_GPUS=2
-LOGGER="wandb"  # change to "console" to print to stdout
+: "${DATA_DIR:="$HOME/data/gsm8k"}"
+: "${NUM_GPUS:=4}"
+: "${LOGGER:=wandb}"  # change to "console" to print to stdout
 
-INFERENCE_BACKEND="vllm"
+: "${INFERENCE_BACKEND:=vllm}"
+: "${PROJECT_NAME:="gsm8k_0.5b_lora"}"
+: "${RUN_NAME:="gsm8k_0.5b_lora_test"}"
+: "${CKPT_PATH:="$HOME/ckpts/gsm8k_0.5b_lora_ckpt"}"
 
 
 uv run --isolated --extra $INFERENCE_BACKEND -m skyrl_train.entrypoints.main_base \
@@ -67,8 +70,8 @@ uv run --isolated --extra $INFERENCE_BACKEND -m skyrl_train.entrypoints.main_bas
   generator.n_samples_per_prompt=5 \
   generator.gpu_memory_utilization=0.8 \
   trainer.logger="$LOGGER" \
-  trainer.project_name="gsm8k_0.5b_lora" \
-  trainer.run_name="gsm8k_0.5b_lora_test" \
+  trainer.project_name="$PROJECT_NAME" \
+  trainer.run_name="$RUN_NAME" \
   trainer.resume_mode=null \
-  trainer.ckpt_path="$HOME/ckpts/gsm8k_0.5b_lora_ckpt" \
+  trainer.ckpt_path="$CKPT_PATH" \
   $@
