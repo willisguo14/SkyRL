@@ -3,27 +3,63 @@ Preprocess the synthetic-code-understanding dataset to parquet format
 """
 
 import argparse
+import ast
 import json
 import os
 import re
 from datasets import load_dataset
 
 
+def has_surrogates(text):
+    """Check if text contains surrogate characters that can't be encoded to UTF-8."""
+    if not isinstance(text, str):
+        return False
+    try:
+        text.encode('utf-8', errors='strict')
+        return False
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return True
+
+
 def extract_ground_truth(example):
     """Extract the ground truth answer from the dataset."""
     # Parse the gold_standard_solution which is a string representation of a dict
-    try:
-        gold_standard = json.loads(example["gold_standard_solution"].replace("'", '"'))
-        return gold_standard["output"]
-    except:
-        # Fallback: try parsing verification_info
-        try:
-            verification = json.loads(example["verification_info"].replace("'", '"'))
-            return verification["ground_truth"]
-        except:
-            # Last resort: return None
-            return None
+    gold_standard = ast.literal_eval(example["gold_standard_solution"])
+    return gold_standard["output"]
 
+def is_valid_example(example):
+    """Check if an example can be processed successfully."""
+    try:
+        # Check for surrogate characters in string fields
+        if has_surrogates(example.get("prompt", "")):
+            return False
+        if has_surrogates(example.get("metadata", "")):
+            return False
+        if has_surrogates(example.get("gold_standard_solution", "")):
+            return False
+        if has_surrogates(example.get("problem_id", "")):
+            return False
+        if has_surrogates(example.get("source", "")):
+            return False
+        if has_surrogates(example.get("task_type", "")):
+            return False
+
+        # Check ground truth extraction
+        ground_truth = extract_ground_truth(example)
+        if ground_truth is None:
+            return False
+        if has_surrogates(str(ground_truth)):
+            return False
+
+        # Check metadata parsing
+        json.loads(example["metadata"].replace("'", '"'))
+
+        # Check prompt modification
+        modify_prompt(example["prompt"])
+
+        return True
+    except Exception as e:
+        return False
 
 def modify_prompt(prompt_text):
     """Modify the prompt to use GSM8k-style instruction format."""
@@ -55,6 +91,7 @@ if __name__ == "__main__":
 
     # Get the train split and split it into train/validation
     full_train = dataset["train"]
+    full_train = full_train.filter(is_valid_example)
 
     # Calculate split sizes
     total_size = len(full_train)
@@ -78,20 +115,12 @@ if __name__ == "__main__":
             # Extract ground truth
             ground_truth = extract_ground_truth(example)
 
-            if ground_truth is None:
-                print(f"Warning: Could not extract ground truth for example {idx} in {split}")
-                # Use empty string as fallback
-                ground_truth = ""
-
             # Modify prompt to use GSM8k instruction format
             original_prompt = example["prompt"]
             modified_prompt_text = modify_prompt(original_prompt)
 
             # Parse metadata
-            try:
-                metadata_dict = json.loads(example["metadata"].replace("'", '"'))
-            except:
-                metadata_dict = {}
+            metadata_dict = json.loads(example["metadata"].replace("'", '"'))
 
             data = {
                 "data_source": data_source,
