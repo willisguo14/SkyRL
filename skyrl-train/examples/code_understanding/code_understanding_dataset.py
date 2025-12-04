@@ -69,7 +69,7 @@ def modify_prompt(prompt_text):
     modified_prompt = re.sub(instruction_pattern, "", prompt_text, flags=re.DOTALL)
 
     # Add GSM8k-style instruction
-    new_instruction = 'Let\'s think step by step and output the final answer after "####".'
+    new_instruction = 'Let\'s think step by step and output the predicted output string after "####".'
     modified_prompt = modified_prompt.strip() + "\n\n" + new_instruction
 
     return modified_prompt
