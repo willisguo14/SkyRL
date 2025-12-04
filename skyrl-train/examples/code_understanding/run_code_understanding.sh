@@ -16,7 +16,7 @@ uv run --isolated --extra $INFERENCE_BACKEND -m examples.code_understanding.main
   data.train_data="['$DATA_DIR/train.parquet']" \
   data.val_data="['$DATA_DIR/validation.parquet']" \
   trainer.algorithm.advantage_estimator="grpo" \
-  trainer.policy.model.path="Qwen/Qwen2.5-0.5B-Instruct" \
+  trainer.policy.model.path="Qwen/Qwen2.5-Coder-0.5B-Instruct" \
   trainer.placement.colocate_all=true \
   trainer.policy.model.lora.rank=32 \
   trainer.policy.model.lora.alpha=32 \

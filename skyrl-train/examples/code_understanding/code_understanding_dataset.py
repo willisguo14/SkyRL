@@ -1,7 +1,3 @@
-"""
-Preprocess the synthetic-code-understanding dataset to parquet format
-"""
-
 import argparse
 import ast
 import json
@@ -10,159 +6,67 @@ import re
 from datasets import load_dataset
 
 
-def has_surrogates(text):
-    """Check if text contains surrogate characters that can't be encoded to UTF-8."""
-    if not isinstance(text, str):
+def filter(example):
+    if any("####" in example[k] for k in ["prompt", "gold_standard_solution"]):
         return False
-    try:
-        text.encode('utf-8', errors='strict')
+    
+    metadata = ast.literal_eval(example["metadata"])
+    if metadata["complexify_iteration"] > 3:
         return False
-    except (UnicodeEncodeError, UnicodeDecodeError):
-        return True
+    
+    return True
 
-
-def extract_ground_truth(example):
-    """Extract the ground truth answer from the dataset."""
-    # Parse the gold_standard_solution which is a string representation of a dict
-    gold_standard = ast.literal_eval(example["gold_standard_solution"])
-    return gold_standard["output"]
-
-def is_valid_example(example):
-    """Check if an example can be processed successfully."""
-    try:
-        # Check for surrogate characters in string fields
-        if has_surrogates(example.get("prompt", "")):
-            return False
-        if has_surrogates(example.get("metadata", "")):
-            return False
-        if has_surrogates(example.get("gold_standard_solution", "")):
-            return False
-        if has_surrogates(example.get("problem_id", "")):
-            return False
-        if has_surrogates(example.get("source", "")):
-            return False
-        if has_surrogates(example.get("task_type", "")):
-            return False
-
-        # Check ground truth extraction
-        ground_truth = extract_ground_truth(example)
-        if ground_truth is None:
-            return False
-        if has_surrogates(str(ground_truth)):
-            return False
-
-        # Check metadata parsing
-        json.loads(example["metadata"].replace("'", '"'))
-
-        # Check prompt modification
-        modify_prompt(example["prompt"])
-
-        return True
-    except Exception as e:
-        return False
-
-def modify_prompt(prompt_text):
-    """Modify the prompt to use GSM8k-style instruction format."""
-    # Remove the original JSON instruction
-    # The instruction is typically at the end: "Return your response as a json with a field 'output'..."
-    instruction_pattern = r"Return your response as a json.*?\.(\n|$)"
-    modified_prompt = re.sub(instruction_pattern, "", prompt_text, flags=re.DOTALL)
-
-    # Add GSM8k-style instruction
-    new_instruction = 'Let\'s think step by step and output the predicted output string after "####".'
-    modified_prompt = modified_prompt.strip() + "\n\n" + new_instruction
-
-    return modified_prompt
-
+def modify_prompt(prompt):
+    old = """Return your response as a json with a field 'output' that contains the predicted output string."""
+    new = """Let's think step by step and output a json with a field 'output' that contains the predicted output string after "####"."""
+    assert prompt.strip().endswith(old)
+    return prompt[:-len(old)] + new + "\n"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", default="/data/user_data/willisg/code_understanding")
-    parser.add_argument("--train_ratio", type=float, default=0.9, help="Ratio of data to use for training")
-
+    parser.add_argument("--test_size", type=float, default=0.1)
+    
     args = parser.parse_args()
-
     args.output_dir = os.path.expanduser(args.output_dir)
-
-    data_source = "PrimeIntellect/synthetic-code-understanding"
-
-    print(f"Loading dataset from {data_source}...")
-    dataset = load_dataset(data_source)
-
-    # Get the train split and split it into train/validation
-    full_train = dataset["train"]
-    full_train = full_train.filter(is_valid_example)
-
-    # Calculate split sizes
-    total_size = len(full_train)
-    train_size = int(total_size * args.train_ratio)
-
-    print(f"Total examples: {total_size}")
-    print(f"Train size: {train_size}, Test size: {total_size - train_size}")
-
-    # Split the dataset
-    train_test_split = full_train.train_test_split(
-        train_size=train_size,
-        seed=42,
-        shuffle=True
-    )
-    train_dataset = train_test_split["train"]
-    val_dataset = train_test_split["test"]
-
-    # Process function to transform data into required format
+    
+    dataset_name = "PrimeIntellect/synthetic-code-understanding"
+    dataset_dict = load_dataset(dataset_name)
+        
+    dataset_dict = dataset_dict["train"].filter(filter).train_test_split(test_size=args.test_size)
+    
+    train_dataset, test_dataset = dataset_dict["train"], dataset_dict["test"]
+    
     def make_map_fn(split):
         def process_fn(example, idx):
-            # Extract ground truth
-            ground_truth = extract_ground_truth(example)
-
-            # Modify prompt to use GSM8k instruction format
-            original_prompt = example["prompt"]
-            modified_prompt_text = modify_prompt(original_prompt)
-
-            # Parse metadata
-            metadata_dict = json.loads(example["metadata"].replace("'", '"'))
-
+            prompt = modify_prompt(example["prompt"])
+            
             data = {
-                "data_source": data_source,
-                "prompt": [
-                    {
-                        "role": "user",
-                        "content": modified_prompt_text,
-                    }
-                ],
+                "data_source": "dataset_name",
+                "prompt": [{"role": "user", "content": prompt}],
                 "env_class": "code_understanding",
                 "reward_spec": {
                     "method": "rule",
-                    "ground_truth": ground_truth,
+                    "ground_truth": example["gold_standard_solution"]
                 },
                 "extra_info": {
                     "split": split,
                     "index": idx,
                     "problem_id": example.get("problem_id", ""),
-                    "source": example.get("source", ""),
-                    "task_type": example.get("task_type", ""),
-                    "metadata": metadata_dict,
-                    "original_prompt": original_prompt,
-                },
+                    "metadata": example.get("metadata", "")
+                }
             }
+            
             return data
-
         return process_fn
 
-    print("Processing train dataset...")
     train_dataset = train_dataset.map(function=make_map_fn("train"), with_indices=True)
-
-    print("Processing validation dataset...")
-    val_dataset = val_dataset.map(function=make_map_fn("test"), with_indices=True)
-
-    # Save to parquet
+    val_dataset = test_dataset.map(function=make_map_fn("test"), with_indices=True)
+    
+    print("train", len(train_dataset))
+    print("val", len(val_dataset))
+    
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
-
-    print(f"Saving datasets to {output_dir}...")
     train_dataset.to_parquet(os.path.join(output_dir, "train.parquet"))
     val_dataset.to_parquet(os.path.join(output_dir, "validation.parquet"))
-
-    print("Done!")
-    print(f"Train dataset saved with {len(train_dataset)} examples")
-    print(f"Validation dataset saved with {len(val_dataset)} examples")
