@@ -72,7 +72,7 @@ def create_input_prediction_example(example, idx, split):
                 "content": prompt_text,
             }
         ],
-        "env_class": "crux_eval",
+        "env_class": "cruxeval",
         "reward_spec": {
             "method": "rule",
             "ground_truth": ground_truth,
@@ -117,7 +117,7 @@ def create_output_prediction_example(example, idx, split):
                 "content": prompt_text,
             }
         ],
-        "env_class": "crux_eval",
+        "env_class": "cruxeval",
         "reward_spec": {
             "method": "rule",
             "ground_truth": ground_truth,
@@ -179,9 +179,9 @@ def process_dataset(dataset_split, split_name, train_ratio=0.8):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", default="~/data/crux_eval",
+    parser.add_argument("--output_dir", default="/data/user_data/willisg/cruxeval",
                         help="Directory to save the processed dataset")
-    parser.add_argument("--train_ratio", type=float, default=0.8,
+    parser.add_argument("--train_ratio", type=float, default=0.9,
                         help="Ratio of examples to use for training (default: 0.8)")
 
     args = parser.parse_args()
