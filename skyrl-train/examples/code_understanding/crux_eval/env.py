@@ -23,8 +23,6 @@ class CruxEvalEnv(BaseTextEnv):
             code=self.code,
             ground_truth=self.ground_truth,
             task_type=self.task_type,
-            format_score=self.format_score,
-            correct_score=self.correct_score
         )
 
     def step(self, action: str) -> BaseTextEnvStepOutput:

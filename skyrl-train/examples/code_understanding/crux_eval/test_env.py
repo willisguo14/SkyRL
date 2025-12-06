@@ -4,7 +4,6 @@ Test script for CruxEval environment.
 Run with: python -m examples.code_understanding.crux_eval.test_env
 """
 
-from omegaconf import DictConfig
 from skyrl_gym.envs import register
 import skyrl_gym
 
@@ -31,7 +30,6 @@ def test_output_prediction():
     # Create environment
     env = skyrl_gym.make(
         "cruxeval",
-        env_config=DictConfig({"format_score": 0.0, "correct_score": 1.0}),
         extras={
             "reward_spec": {"ground_truth": ground_truth},
             "extra_info": {"task_type": task_type, "code": code}
@@ -64,7 +62,6 @@ assert f('bcksrut', 'q') == 'wrong'
 
     env2 = skyrl_gym.make(
         "cruxeval",
-        env_config=DictConfig({"format_score": 0.0, "correct_score": 1.0}),
         extras={
             "reward_spec": {"ground_truth": ground_truth},
             "extra_info": {"task_type": task_type, "code": code}
@@ -79,7 +76,6 @@ assert f('bcksrut', 'q') == 'wrong'
 
     env3 = skyrl_gym.make(
         "cruxeval",
-        env_config=DictConfig({"format_score": 0.0, "correct_score": 1.0}),
         extras={
             "reward_spec": {"ground_truth": ground_truth},
             "extra_info": {"task_type": task_type, "code": code}
@@ -118,7 +114,6 @@ def test_input_prediction():
     # Create environment
     env = skyrl_gym.make(
         "cruxeval",
-        env_config=DictConfig({"format_score": 0.0, "correct_score": 1.0}),
         extras={
             "reward_spec": {"ground_truth": output},
             "extra_info": {"task_type": task_type, "code": code}
