@@ -7,7 +7,7 @@ def extract_answer_content(response: str) -> str:
     Extract content between [ANSWER] and [/ANSWER] tags.
 
     Required format (with flexible whitespace):
-    [THOUGHT]
+    [THOUGHT] (optional, since it's already in the prompt)
     ...
     [/THOUGHT]
     [ANSWER]
@@ -20,8 +20,9 @@ def extract_answer_content(response: str) -> str:
     Returns:
         The content between ANSWER tags (stripped), or empty string if format is invalid
     """
-    # Flexible regex: allows any whitespace before/after/between tags
-    pattern = r'^\s*\[THOUGHT\]\s*(.+?)\s*\[/THOUGHT\]\s*\[ANSWER\]\s*(.+?)\s*\[/ANSWER\]\s*$'
+    # Flexible regex: makes opening [THOUGHT] tag optional since it's in the prompt
+    # Allows any whitespace/newlines before/after/between tags
+    pattern = r'^\s*(?:\[THOUGHT\]\s*)?(.+?)\s*\[/THOUGHT\]\s*\[ANSWER\]\s*(.+?)\s*\[/ANSWER\]\s*$'
     match = re.match(pattern, response, re.DOTALL)
 
     if match:
