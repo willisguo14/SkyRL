@@ -26,13 +26,20 @@ def test_output_prediction():
 
     ground_truth = "'bcksrutq'"
     task_type = "output"
+    input_val = "'bcksrut', 'q'"
+    output_val = "'bcksrutq'"
 
     # Create environment
     env = skyrl_gym.make(
         "cruxeval",
         extras={
             "reward_spec": {"ground_truth": ground_truth},
-            "extra_info": {"task_type": task_type, "code": code}
+            "extra_info": {
+                "task_type": task_type,
+                "code": code,
+                "input": input_val,
+                "output": output_val,
+            }
         },
     )
 
@@ -64,7 +71,12 @@ assert f('bcksrut', 'q') == 'wrong'
         "cruxeval",
         extras={
             "reward_spec": {"ground_truth": ground_truth},
-            "extra_info": {"task_type": task_type, "code": code}
+            "extra_info": {
+                "task_type": task_type,
+                "code": code,
+                "input": input_val,
+                "output": output_val,
+            }
         },
     )
     step_output = env2.step(wrong_response)
@@ -78,7 +90,12 @@ assert f('bcksrut', 'q') == 'wrong'
         "cruxeval",
         extras={
             "reward_spec": {"ground_truth": ground_truth},
-            "extra_info": {"task_type": task_type, "code": code}
+            "extra_info": {
+                "task_type": task_type,
+                "code": code,
+                "input": input_val,
+                "output": output_val,
+            }
         },
     )
     step_output = env3.step(no_format_response)
@@ -107,16 +124,21 @@ def test_input_prediction():
     text_list.append(value)
     return ''.join(text_list)"""
 
-    output = "'bcksrutq'"
-    input_value = "f('bcksrut', 'q')"
+    output_val = "'bcksrutq'"
+    input_val = "'bcksrut', 'q'"
     task_type = "input"
 
     # Create environment
     env = skyrl_gym.make(
         "cruxeval",
         extras={
-            "reward_spec": {"ground_truth": output},
-            "extra_info": {"task_type": task_type, "code": code}
+            "reward_spec": {"ground_truth": output_val},
+            "extra_info": {
+                "task_type": task_type,
+                "code": code,
+                "input": input_val,
+                "output": output_val,
+            }
         },
     )
 
