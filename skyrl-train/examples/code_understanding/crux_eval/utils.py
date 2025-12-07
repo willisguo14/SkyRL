@@ -71,26 +71,41 @@ def parse_assert_statement(answer_content: str, task_type: str) -> str:
 def check_cruxeval_correctness(
     code: str,
     prediction: str,
-    ground_truth: str,
+    task_type: str,
+    input_val: str,
+    output_val: str,
     timeout: int = 3
 ) -> bool:
     """
     Check if the prediction is correct using sandboxed execution.
 
-    Executes: code + "assert ground_truth == prediction"
-    - For input prediction: prediction is f(...), so this executes the function
-    - For output prediction: prediction is a value, so this is a string comparison
+    For input prediction:
+        - prediction is f(...) (function call with predicted input)
+        - Executes: code + "assert prediction == output_val"
+        - Verifies the predicted input produces the expected output
+
+    For output prediction:
+        - prediction is a value (predicted output)
+        - Executes: code + "assert f(input_val) == prediction"
+        - Verifies the given input produces the predicted output
 
     Args:
         code: The function code
         prediction: The predicted value (function call for input, value for output)
-        ground_truth: The ground truth output value
+        task_type: Either "input" or "output"
+        input_val: The input value from the dataset
+        output_val: The output value from the dataset
         timeout: Execution timeout in seconds
 
     Returns:
         True if prediction is correct, False otherwise
     """
-    code_to_execute = f"{code}\nassert {ground_truth} == {prediction}"
+    if task_type == "input":
+        # For input prediction: verify predicted function call equals expected output
+        code_to_execute = f"{code}\nassert {prediction} == {output_val}"
+    else:  # task_type == "output"
+        # For output prediction: verify given input produces predicted output
+        code_to_execute = f"{code}\nassert f({input_val}) == {prediction}"
 
     try:
         return check_correctness(code_to_execute, timeout)
@@ -103,6 +118,8 @@ def compute_score(
     code: str,
     ground_truth: str,
     task_type: str,
+    input_val: str,
+    output_val: str,
 ) -> float:
     """
     Compute the score for a CruxEval response.
@@ -110,8 +127,10 @@ def compute_score(
     Args:
         response: The model's response
         code: The function code
-        ground_truth: The ground truth value
+        ground_truth: The ground truth output value
         task_type: Either "input" or "output"
+        input_val: The input value from the dataset
+        output_val: The output value from the dataset
 
     Returns:
         1.0 if correct, 0.0 otherwise
@@ -131,6 +150,8 @@ def compute_score(
         return 0.0
 
     # Check correctness
-    is_correct = check_cruxeval_correctness(code, prediction, ground_truth)
+    is_correct = check_cruxeval_correctness(
+        code, prediction, task_type, input_val, output_val
+    )
 
     return 1.0 if is_correct else 0.0

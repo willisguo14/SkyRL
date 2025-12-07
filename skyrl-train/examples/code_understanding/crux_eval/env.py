@@ -12,10 +12,14 @@ class CruxEvalEnv(BaseTextEnv):
         assert "extra_info" in extras, "extra_info field is required"
         assert "task_type" in extras["extra_info"], "task_type is required in extra_info field"
         assert "code" in extras["extra_info"], "code is required in extra_info field"
+        assert "input" in extras["extra_info"], "input is required in extra_info field"
+        assert "output" in extras["extra_info"], "output is required in extra_info field"
 
         self.ground_truth = extras["reward_spec"]["ground_truth"]
         self.task_type = extras["extra_info"]["task_type"]
         self.code = extras["extra_info"]["code"]
+        self.input_val = extras["extra_info"]["input"]
+        self.output_val = extras["extra_info"]["output"]
 
     def _get_reward(self, action: str) -> float:
         return compute_score(
@@ -23,6 +27,8 @@ class CruxEvalEnv(BaseTextEnv):
             code=self.code,
             ground_truth=self.ground_truth,
             task_type=self.task_type,
+            input_val=self.input_val,
+            output_val=self.output_val,
         )
 
     def step(self, action: str) -> BaseTextEnvStepOutput:

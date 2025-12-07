@@ -79,8 +79,8 @@ def create_input_prediction_example(example, idx, split):
         assert_statement=assert_statement
     )
 
-    # Ground truth is the full assertion with correct input
-    ground_truth = f"assert f({input_val}) == {output_val}"
+    # Ground truth is just the output value (for checking correctness)
+    ground_truth = output_val
 
     data = {
         "data_source": "cruxeval-org/cruxeval",
@@ -124,8 +124,8 @@ def create_output_prediction_example(example, idx, split):
         assert_statement=assert_statement
     )
 
-    # Ground truth is the full assertion with correct output
-    ground_truth = f"assert f({input_val}) == {output_val}"
+    # Ground truth is just the output value (for checking correctness)
+    ground_truth = output_val
 
     data = {
         "data_source": "cruxeval-org/cruxeval",
