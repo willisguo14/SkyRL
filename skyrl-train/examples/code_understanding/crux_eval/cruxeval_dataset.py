@@ -10,39 +10,57 @@ import argparse
 import os
 from datasets import load_dataset, Dataset, DatasetDict
 
+INPUT_PREDICTION_PROMPT_TEMPLATE = """You are given a Python function f and an assertion containing an output to the function. Your task is to find an input such that executing f on the input leads to the given output. Execute the program step by step in [THOUGHT] and [/THOUGHT] tags before arriving at an answer, and provide the full assertion with the correct input in [ANSWER] and [/ANSWER] tags, following the examples. Do NOT output any extra information. 
 
-INPUT_PREDICTION_PROMPT_TEMPLATE = """You are given a Python function f and an assertion containing an output to the function. Your task is to find an input such that executing f on the input leads to the given output.
+[PYTHON]
+def f(x):
+    return x + 1
+assert f(??) == 17
+[/PYTHON]
+[THOUGHT]
+To find an input such that executing f on the input leads to the given output, we can work backwards from the given assertion. We know that f(??) == 17. 
+
+Since the function f(x) returns x + 1, for f(??) to be equal to 17, the value of ?? should be 16. 
+[/THOUGHT]
+[ANSWER]
+assert f(16) == 17
+[/ANSWER]
 
 [PYTHON]
 {code}
 {assert_statement}
 [/PYTHON]
-
-Execute the program step by step in [THOUGHT] [/THOUGHT] before arriving at an answer, and provide the full assertion with the correct input in [ANSWER] and [/ANSWER] tags. Do NOT output any extra information. You MUST follow this output format exactly:
-
 [THOUGHT]
-EXECUTE CODE STEP BY STEP
+"""
+
+
+OUTPUT_PREDICTION_PROMPT_TEMPLATE = """You are given a Python function f and an assertion containing an input to the function. Your task is to find the output when executing f on the input. Execute the program step by step in [THOUGHT] and [/THOUGHT] tags before arriving at an answer, and provide the full assertion with the correct output in [ANSWER] and [/ANSWER] tags, following the examples. Do NOT output any extra information.
+
+[PYTHON]
+def f(s):
+    s = s + s
+    return "b" + s + "a"
+assert f("hi") == ??
+[/PYTHON]
+[THOUGHT]
+Let's execute the code step by step:
+
+1. The function f is defined, which takes a single argument s.
+2. The function is called with the argument "hi", so within the function, s is initially "hi".
+3. Inside the function, s is concatenated with itself, so s becomes "hihi".
+4. The function then returns a new string that starts with "b", followed by the value of s (which is now "hihi"), and ends with "a".
+5. The return value of the function is therefore "bhihia".
 [/THOUGHT]
 [ANSWER]
-ASSERT STATEMENT
-[/ANSWER]"""
-
-
-OUTPUT_PREDICTION_PROMPT_TEMPLATE = """You are given a Python function f and an assertion containing an input to the function. Your task is to find the output when executing f on the input.
+assert f("hi") == "bhihia"
+[/ANSWER]
 
 [PYTHON]
 {code}
 {assert_statement}
 [/PYTHON]
-
-Execute the program step by step in [THOUGHT] [/THOUGHT] before arriving at an answer, and provide the full assertion with the correct output in [ANSWER] and [/ANSWER] tags. Do NOT output any extra information. You MUST follow this output format exactly:
-
 [THOUGHT]
-EXECUTE CODE STEP BY STEP
-[/THOUGHT]
-[ANSWER]
-ASSERT STATEMENT
-[/ANSWER]"""
+"""
 
 
 def create_input_prediction_example(example, idx, split):
