@@ -6,7 +6,7 @@ set -x
 
 : "${USER_DIR:="/data/user_data/willisg"}"
 : "${DATA_DIR:="/data/user_data/willisg/cruxeval"}"
-: "${NUM_GPUS:=1}"
+: "${NUM_GPUS:=2}"
 : "${LOGGER:=wandb}" # change to "console" to print to stdout
 
 : "${INFERENCE_BACKEND:=vllm}"
@@ -14,9 +14,9 @@ set -x
 
 uv run --isolated --extra $INFERENCE_BACKEND -m examples.code_understanding.crux_eval.main_cruxeval \
   data.train_data="['$DATA_DIR/train.parquet']" \
-  data.val_data="['$DATA_DIR/validation.parquet']" \
+  data.val_data="['$DATA_DIR/validation.parquet', '/data/user_data/willisg/gsm8k/validation.parquet']" \
   trainer.algorithm.advantage_estimator="grpo" \
-  trainer.policy.model.path="Qwen/Qwen2.5-Coder-0.5B-Instruct" \
+  trainer.policy.model.path="/data/user_data/willisg/ckpts_hf/gsm8k/global_step_80/policy/" \
   trainer.placement.colocate_all=true \
   trainer.policy.model.lora.rank=32 \
   trainer.policy.model.lora.alpha=32 \
@@ -27,16 +27,16 @@ uv run --isolated --extra $INFERENCE_BACKEND -m examples.code_understanding.crux
   generator.inference_engine_tensor_parallel_size=1 \
   trainer.epochs=200 \
   trainer.eval_batch_size=1024 \
-  trainer.eval_before_train=false \
+  trainer.eval_before_train=true \
   trainer.eval_interval=5 \
   trainer.update_epochs_per_batch=1 \
-  trainer.train_batch_size=64 \
-  trainer.policy_mini_batch_size=32 \
+  trainer.train_batch_size=256 \
+  trainer.policy_mini_batch_size=128 \
   trainer.micro_forward_batch_size_per_gpu=16 \
   trainer.micro_train_batch_size_per_gpu=16 \
-  trainer.ckpt_interval=10 \
+  trainer.ckpt_interval=20 \
   trainer.max_prompt_length=1024 \
-  generator.sampling_params.max_generate_length=1024 \
+  generator.sampling_params.max_generate_length=384 \
   trainer.policy.optimizer_config.lr=3.0e-5 \
   trainer.algorithm.use_kl_loss=true \
   generator.backend=$INFERENCE_BACKEND \

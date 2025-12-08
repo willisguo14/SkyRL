@@ -18,8 +18,6 @@ def f(x):
 assert f(??) == 17
 [/PYTHON]
 [THOUGHT]
-To find an input such that executing f on the input leads to the given output, we can work backwards from the given assertion. We know that f(??) == 17. 
-
 Since the function f(x) returns x + 1, for f(??) to be equal to 17, the value of ?? should be 16. 
 [/THOUGHT]
 [ANSWER]
@@ -44,12 +42,10 @@ assert f("hi") == ??
 [/PYTHON]
 [THOUGHT]
 Let's execute the code step by step:
-
-1. The function f is defined, which takes a single argument s.
-2. The function is called with the argument "hi", so within the function, s is initially "hi".
-3. Inside the function, s is concatenated with itself, so s becomes "hihi".
-4. The function then returns a new string that starts with "b", followed by the value of s (which is now "hihi"), and ends with "a".
-5. The return value of the function is therefore "bhihia".
+1. f is called with s = "hi"
+2. s is concatenated with itself, so s becomes "hihi"
+3. f returns a new string that starts with "b", followed by s ("hihi") and ends with "a"
+4. f returns "bhihia"
 [/THOUGHT]
 [ANSWER]
 assert f("hi") == "bhihia"
